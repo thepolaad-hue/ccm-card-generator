@@ -1,0 +1,5 @@
+{
+  "name": "CCM Card Generator",
+  "description": "An application to create and manage custom invitation cards. Users can input details for multiple events, preview the cards in a structured layout, and export the final compilation as a PDF document.",
+  "requestFramePermissions": []
+}

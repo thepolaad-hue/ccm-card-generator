@@ -1,52 +1,256 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="./vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CCM Card Generator</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <style>
-      body {
-        font-family: 'Noto Sans Devanagari', sans-serif;
-      }
-    </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/"
-  }
-}
-</script>
-  <!-- Babel for in-browser transpilation -->
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CCM Card Generator</title>
+  <link rel="icon" type="image/svg+xml" href="./vite.svg" />
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;700&display=swap" rel="stylesheet">
+
+  <!-- PDF + Canvas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <!-- React & Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Noto Sans Devanagari', sans-serif;
+      background-color: #f8fafc;
+    }
+  </style>
 </head>
-  <body>
-    <div id="root"></div>
-    <script type="text/babel" data-type="module">
-      import React from 'react';
-      import ReactDOM from 'react-dom/client';
-      import App from './App.tsx';
+<body>
+  <div id="root"></div>
 
-      const rootElement = document.getElementById('root');
-      if (!rootElement) {
-        throw new Error("Could not find root element to mount to");
+  <script type="text/babel">
+    const { useState, useCallback } = React;
+
+    // -----------------------------
+    // CardData type (JS version)
+    // -----------------------------
+    // {
+    //   id, place, date, time, inviterName, companyName, address, phone, quantity
+    // }
+
+    // -----------------------------
+    // PDF service
+    // -----------------------------
+    const generatePdf = async (elementId) => {
+      const input = document.getElementById(elementId);
+      if (!input) {
+        alert("Could not find content to generate PDF.");
+        return;
       }
+      try {
+        const canvas = await html2canvas(input, { scale: 2, useCORS: true });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jspdf.jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
 
-      const root = ReactDOM.createRoot(rootElement);
-      root.render(
-        <React.StrictMode>
-          <App />
-        </React.StrictMode>
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = pdf.internal.pageSize.getHeight();
+        const canvasWidth = canvas.width;
+        const canvasHeight = canvas.height;
+
+        const ratio = canvasWidth / canvasHeight;
+        const imgWidth = pdfWidth - 40;
+        const imgHeight = imgWidth / ratio;
+
+        let heightLeft = imgHeight;
+        let position = 20;
+
+        pdf.addImage(imgData, 'PNG', 20, position, imgWidth, imgHeight);
+        heightLeft -= (pdfHeight - 40);
+
+        while (heightLeft > 0) {
+          position = -heightLeft + 20;
+          pdf.addPage();
+          pdf.addImage(imgData, 'PNG', 20, position, imgWidth, imgHeight);
+          heightLeft -= (pdfHeight - 40);
+        }
+        pdf.save('ccm-cards.pdf');
+      } catch (err) {
+        console.error(err);
+        alert("Error generating PDF. Check console.");
+      }
+    };
+
+    // -----------------------------
+    // CardForm component
+    // -----------------------------
+    const CardForm = ({ card, onUpdate, onRemove, index }) => {
+      const InputField = ({ label, value, onChange }) => (
+        <div className="flex flex-col">
+          <label className="mb-1 text-sm font-medium text-gray-700">{label}</label>
+          <input
+            type="text"
+            value={value}
+            onChange={onChange}
+            className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
       );
-    </script>
-  </body>
+
+      const handleInputChange = (field) => (e) => onUpdate(card.id, field, e.target.value);
+
+      return (
+        <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200 relative mb-6">
+          <h3 className="text-xl font-bold mb-4 text-indigo-700">Card {index + 1}</h3>
+          <button
+            onClick={() => onRemove(card.id)}
+            className="absolute top-4 right-4 text-red-500 hover:text-red-700 font-semibold transition-colors"
+          >
+            Remove
+          </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <InputField label="स्थळ (Place)" value={card.place} onChange={handleInputChange('place')} />
+            <InputField label="दिनांक (Date)" value={card.date} onChange={handleInputChange('date')} />
+            <InputField label="वेळ (Time)" value={card.time} onChange={handleInputChange('time')} />
+            <InputField label="निमंत्रक (Inviter Name)" value={card.inviterName} onChange={handleInputChange('inviterName')} />
+            <InputField label="कंपनी (Company Name)" value={card.companyName} onChange={handleInputChange('companyName')} />
+            <InputField label="पत्ता (Address)" value={card.address} onChange={handleInputChange('address')} />
+            <InputField label="फोन (Phone)" value={card.phone} onChange={handleInputChange('phone')} />
+            <InputField label="Quantity" value={card.quantity} onChange={handleInputChange('quantity')} />
+          </div>
+        </div>
+      );
+    };
+
+    // -----------------------------
+    // CardPreview component
+    // -----------------------------
+    const CardPreview = ({ card }) => (
+      <div className="border-b border-gray-400 relative py-4 px-2 text-black">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1 pr-4">
+            <p><span className="font-bold">स्थळ :</span> {card.place || '...'}</p>
+            <p><span className="font-bold">दिनांक :</span> {card.date || '...'}</p>
+            <p><span className="font-bold">वेळ :</span> {card.time || '...'}</p>
+          </div>
+          <div className="border-l border-gray-400 pl-4 text-center">
+            <p className="font-bold">● निमंत्रक ●</p>
+            <p>{card.inviterName || '...'}</p>
+            <p className="font-bold text-lg my-1">{card.companyName || '...'}</p>
+            <p className="text-sm">{card.address || '...'}</p>
+            <p>{card.phone || '...'}</p>
+          </div>
+        </div>
+        <div className="absolute bottom-4 right-4 text-gray-300 text-lg">{card.quantity}</div>
+      </div>
+    );
+
+    // -----------------------------
+    // Main App
+    // -----------------------------
+    const App = () => {
+      const [cards, setCards] = useState([]);
+      const [isLoadingPdf, setIsLoadingPdf] = useState(false);
+
+      const addCard = () => {
+        const newCard = {
+          id: crypto.randomUUID(),
+          place: '',
+          date: '',
+          time: 'सायं 06:00 वाजता',
+          inviterName: '',
+          companyName: '',
+          address: '',
+          phone: '',
+          quantity: '60',
+        };
+        setCards(prev => [...prev, newCard]);
+      };
+
+      const updateCard = useCallback((id, field, value) => {
+        setCards(prev => prev.map(card => card.id === id ? { ...card, [field]: value } : card));
+      }, []);
+
+      const removeCard = (id) => setCards(prev => prev.filter(card => card.id !== id));
+
+      const handleGeneratePdf = async () => {
+        if (cards.length === 0) {
+          alert("Please add at least one card before generating a PDF.");
+          return;
+        }
+        setIsLoadingPdf(true);
+        await generatePdf('pdf-content');
+        setIsLoadingPdf(false);
+      };
+
+      return (
+        <div className="bg-gray-50 min-h-screen">
+          <header className="bg-white shadow-md">
+            <div className="container mx-auto px-4 py-6">
+              <h1 className="text-4xl font-bold text-center text-gray-800">CCM Card Generator</h1>
+              <p className="text-center text-gray-600 mt-2">Create and export your invitation cards as a PDF</p>
+            </div>
+          </header>
+
+          <main className="container mx-auto p-4 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Form Section */}
+            <div className="lg:pr-4">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-semibold text-gray-700">Card Details</h2>
+                <button
+                  onClick={addCard}
+                  className="px-6 py-2 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
+                >
+                  + Add Card
+                </button>
+              </div>
+              {cards.length > 0 ? cards.map((card, idx) => (
+                <CardForm key={card.id} card={card} onUpdate={updateCard} onRemove={removeCard} index={idx} />
+              )) : (
+                <div className="text-center py-12 px-6 bg-white rounded-lg shadow-md border border-gray-200">
+                  <p className="text-gray-500">No cards added yet. Click "Add Card" to get started!</p>
+                </div>
+              )}
+            </div>
+
+            {/* Preview Section */}
+            <div className="lg:pl-4">
+              <div className="sticky top-8">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-semibold text-gray-700">Live Preview</h2>
+                  <button
+                    onClick={handleGeneratePdf}
+                    disabled={isLoadingPdf || cards.length === 0}
+                    className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all"
+                  >
+                    {isLoadingPdf ? 'Generating...' : 'Generate PDF'}
+                  </button>
+                </div>
+                <div id="pdf-content" className="bg-white p-4 rounded-lg shadow-lg border border-gray-200">
+                  {cards.length > 0 ? (
+                    <div className="w-[595px] max-w-full mx-auto border-t border-gray-400">
+                      {cards.map(card => <CardPreview key={card.id} card={card} />)}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 px-6">
+                      <p className="text-gray-500">Your card previews will appear here.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      );
+    };
+
+    // Render
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
 </html>

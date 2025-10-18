@@ -1,4 +1,3 @@
-
 import React from 'react';
 import type { CardData } from '../types.ts';
 
@@ -25,7 +24,7 @@ export const CardPreview: React.FC<CardPreviewProps> = ({ card }) => {
           <p>{card.phone || '...'}</p>
         </div>
       </div>
-      <div className="absolute bottom-4 right-4 text-gray-600 text-lg">
+      <div className="absolute bottom-4 right-4 text-gray-300 text-lg">
         {card.quantity}
       </div>
     </div>
